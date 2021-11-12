@@ -114,16 +114,48 @@
 #' @importFrom svgPanZoom svgPanZoomOutput
 .cytomapper_body <- function(){
     cm_body <- dashboardBody(
-
-        fluidRow(width = 12, id = "tabbox1",
-            box(title = "Scatter Plots", value = "tab1", 
+        
+        tabBox(width = 12, id = "tabbox1",
+               tabPanel(title = "Scatter Plots", value = "tab1", 
                         uiOutput("AdditionalPlots_tab1")),
-            box(title = "Images", value = "tab2", 
+               tabPanel(title = "Images", value = "tab2", 
                         uiOutput("AdditionalPlots_tab2")))
-        )
-
+    )
+    
     return(cm_body)
+    
+}
 
-    }
+# Create the main body
+#' @importFrom svgPanZoom svgPanZoomOutput
+.cytomapper_body_notabs <- function(){
+    cm_body <- dashboardBody(
+        
+        fluidRow(width = 12, id = "tabbox1",
+                 box(title = "Scatter Plots", value = "tab1", 
+                     uiOutput("AdditionalPlots_tab1")),
+                 box(title = "Images", value = "tab2", 
+                     uiOutput("AdditionalPlots_tab2")))
+    )
+    
+    return(cm_body)
+    
+}
+
+# Create the main body
+#' @importFrom svgPanZoom svgPanZoomOutput
+.pickcell_body <- function(){
+    cm_body <- dashboardBody(
+        
+        fluidRow(width = 12, id = "tabbox1",
+                 box(title = "Images", value = "tab1", 
+                     uiOutput("AdditionalPlots_tab1")),
+                 box(title = "Scatter Plots", value = "tab2", 
+                     uiOutput("AdditionalPlots_tab2")))
+    )
+    
+    return(cm_body)
+    
+}
 
 

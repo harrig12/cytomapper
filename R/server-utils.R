@@ -290,37 +290,117 @@
 }
 
 .addPlots_tab1 <- function(input) {
-
+    
     renderUI({
-        cur_row <- ceiling(input$plotCount / 2)
+        cur_row <- ceiling(input$plotCount / 3)
         # Generate boxes
         box_list <- lapply(seq_len(input$plotCount), function(cur_plot) {
-
+            
             cur_val <- (cur_plot * 2) - 1
-
+            
             # Create brush options
             cur_brush_opts <- brushOpts(paste0("plot_brush", cur_plot),
                                         fill = .create_colours(cur_plot),
                                         stroke = .create_colours(cur_plot),
                                         direction = "xy",
                                         resetOnNew = FALSE)
-
+            
             box(plotOutput(paste0("scatter", cur_plot),
-                            brush = cur_brush_opts),
+                           brush = cur_brush_opts),
+                verbatimTextOutput(paste0("info", cur_plot)),
+                title = paste("Plot", cur_plot),
+                status = "primary",
+                width = 4)
+        })
+        
+        lapply(seq_len(cur_row), function(cr) {
+            cur_val <- (cr * 3) - 2
+            fluidRow(box_list[seq.int(cur_val, cur_val + 2)])
+        })
+    })
+}
+
+.addPlots_tab2 <- function(input, object, mask, image) {
+    
+    if (is.null(mask) && is.null(image)) {
+        return(NULL)
+    } else if (!is.null(image)) {
+        contrast_input_1 <- numericInput("contrast_marker_1",
+                                         label = span(paste("Contrast marker 1"),
+                                                      style = "color: black; padding-top: 0px"),
+                                         value = 1)
+        contrast_input_2 <- numericInput("contrast_marker_2",
+                                         label = span(paste("Contrast marker 2"),
+                                                      style = "color: black; padding-top: 0px"),
+                                         value = 1)
+    } else {
+        contrast_input_1 <- contrast_input_2 <- NULL
+    }
+    
+    markers <- rownames(object)
+    
+    renderUI({
+        
+        fluidRow(box(column(width = 12,
+                            actionButton("resetMarkers", label = "Reset markers",
+                                         style = "background-color: #46EC46; color: black;")),
+                     column(width = 6,
+                            selectInput("exprs_marker_1",
+                                        label = span(paste("Select marker 1"),
+                                                     style = "color: black"),
+                                        choices = markers),
+                            contrast_input_1),
+                     column(width = 6,
+                            selectInput("exprs_marker_2",
+                                        label = span(paste("Select marker 2"),
+                                                     style = "color: black"),
+                                        choices = c(markers, ""),
+                                        selected = ""),
+                            contrast_input_2),
+                     column(width = 12,
+                            svgPanZoomOutput("image_expression", height = "300px")),
+                     title = "Expression", status = "primary",
+                     width = 6, height = "550px"),
+                 box(
+                     column(width = 12,
+                            svgPanZoomOutput("image_selection")),
+                     title = "Selection", id = "selection", status = "primary",
+                     width = 6, height = "550px"))
+    })
+}
+
+
+.addPlots_tab1_notabs <- function(input) {
+    
+    renderUI({
+        cur_row <- ceiling(input$plotCount / 2)
+        # Generate boxes
+        box_list <- lapply(seq_len(input$plotCount), function(cur_plot) {
+            
+            cur_val <- (cur_plot * 2) - 1
+            
+            # Create brush options
+            cur_brush_opts <- brushOpts(paste0("plot_brush", cur_plot),
+                                        fill = .create_colours(cur_plot),
+                                        stroke = .create_colours(cur_plot),
+                                        direction = "xy",
+                                        resetOnNew = FALSE)
+            
+            box(plotOutput(paste0("scatter", cur_plot),
+                           brush = cur_brush_opts),
                 verbatimTextOutput(paste0("info", cur_plot)),
                 title = paste("Plot", cur_plot),
                 status = "primary",
                 width = 6)
         })
-
+        
         lapply(seq_len(cur_row), function(cr) {
             cur_val <- (cr * 2) - 1
             fluidRow(box_list[seq.int(cur_val, cur_val + 1)])
         })
     })
 }
-
-.addPlots_tab2 <- function(input, object, mask, image) {
+.addPlots_tab2_notabs <- function(input, object, mask, image) {
 
     if (is.null(mask) && is.null(image)) {
         return(NULL)
@@ -341,30 +421,82 @@
 
     renderUI({
 
-        tabsetPanel(tabPanel(column(width = 12,
+        tabsetPanel(tabPanel(box(column(width = 12,
                         actionButton("resetMarkers", label = "Reset markers",
                         style = "background-color: #46EC46; color: black;")),
-                column(width = 12,
+                column(width = 6,
                     selectInput("exprs_marker_1",
                         label = span(paste("Select marker 1"),
                             style = "color: black"),
                         choices = markers),
                     contrast_input_1),
-                column(width = 12,
+                column(width = 6,
                     selectInput("exprs_marker_2",
                         label = span(paste("Select marker 2"),
                             style = "color: black"),
                         choices = c(markers, ""),
                         selected = ""),
                     contrast_input_2),
-                column(width = 12,
-                        svgPanZoomOutput("image_expression", height = "300px")),
+                column(width = 6,
+                        svgPanZoomOutput("image_expression", height = "300px"))),
                 title = "Expression", status = "primary"),
                tabPanel(svgPanZoomOutput("image_selection"),
                     title = "Selection", id = "selection", status = "primary",
                     ))
     })
 }
+
+.addPlots_tab1_pickcell <- function(input, object, mask, image) {
+    
+    if (is.null(mask) && is.null(image)) {
+        return(NULL)
+    } else if (!is.null(image)) {
+        contrast_input_1 <- numericInput("contrast_marker_1",
+                                         label = span(paste("Contrast marker 1"),
+                                                      style = "color: black; padding-top: 0px"),
+                                         value = 1)
+        contrast_input_2 <- numericInput("contrast_marker_2",
+                                         label = span(paste("Contrast marker 2"),
+                                                      style = "color: black; padding-top: 0px"),
+                                         value = 1)
+    } else {
+        contrast_input_1 <- contrast_input_2 <- NULL
+    }
+    
+    markers <- rownames(object)
+    
+    renderUI({
+        
+        tabsetPanel(tabPanel(column(width = 12,
+                                    actionButton("resetMarkers", label = "Reset markers",
+                                                 style = "background-color: #46EC46; color: black;")),
+                             column(width = 6,
+                                    selectInput("exprs_marker_1",
+                                                label = span(paste("Select marker 1"),
+                                                             style = "color: black"),
+                                                choices = markers),
+                                    contrast_input_1),
+                             column(width = 6,
+                                    selectInput("exprs_marker_2",
+                                                label = span(paste("Select marker 2"),
+                                                             style = "color: black"),
+                                                choices = c(markers, ""),
+                                                selected = ""),
+                                    contrast_input_2), 
+                             title = "Expression", status = "primary"),
+                    tabPanel(plotOutput("expression_centroids"),
+                             title = "Selection", id = "selection", status = "primary",
+                    ))
+        
+    })
+}
+
+.addPlots_tab2_pickcell <- function(input) {
+    
+    renderPrint({names(input)})
+    
+}
+
 
 # Function to allow brushing
 #' @importFrom S4Vectors metadata
@@ -743,6 +875,43 @@
                     controlIconsEnabled = TRUE, viewBox = FALSE))
         }
     })
+}
+
+# Visualize cell centroids on images
+.createExpressionCentroids <- function(input, object, mask, 
+                                   image, img_id, cell_id, ...){
+    renderPlot({   
+        cur_markers <- .select_markers(input)
+        cur_bcg <- .select_contrast(input)
+        
+        if (is.null(image)) {
+            cur_mask <- mask[mcols(mask)[,img_id] == input$sample]
+            
+                plotCells(object = object,
+                          mask = cur_mask,
+                          cell_id = cell_id,
+                          img_id = img_id,
+                          colour_by = cur_markers,
+                          exprs_values = input$assay,
+                          ...)
+                points(x=c(0,100,200), y = c(0,100,200), col = 2, cex = 2, pch = 20)
+    
+        } else {
+            
+            if (length(cur_markers) > 1) {
+                validate(need(cur_markers[1] != cur_markers[2],
+                              message = "Please specify two different markers"))
+            }
+            
+            cur_image <- image[mcols(image)[,img_id] == input$sample]
+                plotPixels(image = cur_image,
+                           colour_by = cur_markers,
+                           bcg = cur_bcg,
+                           ...)
+                points(x=c(0,100,200), y = c(0,100,200), col = 2, cex = 2, pch = 20)
+        
+            }
+        })
 }
 
 # Visualize selected cells on images
