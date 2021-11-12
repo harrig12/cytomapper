@@ -292,7 +292,7 @@
 .addPlots_tab1 <- function(input) {
 
     renderUI({
-        cur_row <- ceiling(input$plotCount / 3)
+        cur_row <- ceiling(input$plotCount / 2)
         # Generate boxes
         box_list <- lapply(seq_len(input$plotCount), function(cur_plot) {
 
@@ -310,12 +310,12 @@
                 verbatimTextOutput(paste0("info", cur_plot)),
                 title = paste("Plot", cur_plot),
                 status = "primary",
-                width = 4)
+                width = 6)
         })
 
         lapply(seq_len(cur_row), function(cr) {
-            cur_val <- (cr * 3) - 2
-            fluidRow(box_list[seq.int(cur_val, cur_val + 2)])
+            cur_val <- (cr * 2) - 1
+            fluidRow(box_list[seq.int(cur_val, cur_val + 1)])
         })
     })
 }
@@ -341,16 +341,16 @@
 
     renderUI({
 
-        fluidRow(box(column(width = 12,
+        tabsetPanel(tabPanel(column(width = 12,
                         actionButton("resetMarkers", label = "Reset markers",
                         style = "background-color: #46EC46; color: black;")),
-                column(width = 6,
+                column(width = 12,
                     selectInput("exprs_marker_1",
                         label = span(paste("Select marker 1"),
                             style = "color: black"),
                         choices = markers),
                     contrast_input_1),
-                column(width = 6,
+                column(width = 12,
                     selectInput("exprs_marker_2",
                         label = span(paste("Select marker 2"),
                             style = "color: black"),
@@ -359,13 +359,10 @@
                     contrast_input_2),
                 column(width = 12,
                         svgPanZoomOutput("image_expression", height = "300px")),
-                title = "Expression", status = "primary",
-                width = 6, height = "550px"),
-            box(
-                column(width = 12,
-                    svgPanZoomOutput("image_selection")),
+                title = "Expression", status = "primary"),
+               tabPanel(svgPanZoomOutput("image_selection"),
                     title = "Selection", id = "selection", status = "primary",
-                    width = 6, height = "550px"))
+                    ))
     })
 }
 
