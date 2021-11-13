@@ -421,7 +421,8 @@
 
     renderUI({
 
-        tabsetPanel(tabPanel(box(column(width = 12,
+        tabsetPanel(tabPanel(box(width = 12, 
+                column(width = 12,
                         actionButton("resetMarkers", label = "Reset markers",
                         style = "background-color: #46EC46; color: black;")),
                 column(width = 6,
@@ -437,7 +438,7 @@
                         choices = c(markers, ""),
                         selected = ""),
                     contrast_input_2),
-                column(width = 6,
+                column(width = 12,
                         svgPanZoomOutput("image_expression", height = "300px"))),
                 title = "Expression", status = "primary"),
                tabPanel(svgPanZoomOutput("image_selection"),
@@ -467,26 +468,30 @@
     
     renderUI({
         
-        tabsetPanel(tabPanel(column(width = 12,
-                                    actionButton("resetMarkers", label = "Reset markers",
-                                                 style = "background-color: #46EC46; color: black;")),
-                             column(width = 6,
-                                    selectInput("exprs_marker_1",
-                                                label = span(paste("Select marker 1"),
-                                                             style = "color: black"),
-                                                choices = markers),
-                                    contrast_input_1),
-                             column(width = 6,
-                                    selectInput("exprs_marker_2",
-                                                label = span(paste("Select marker 2"),
-                                                             style = "color: black"),
-                                                choices = c(markers, ""),
-                                                selected = ""),
-                                    contrast_input_2), 
-                             title = "Expression", status = "primary"),
-                    tabPanel(plotOutput("expression_centroids"),
-                             title = "Selection", id = "selection", status = "primary",
-                    ))
+        bru <- brushOpts("centroid_brush",
+                  direction = "xy",
+                  resetOnNew = F)
+        
+        
+        fluidRow(column(width = 12,
+                        plotOutput("expression_centroids", brush = bru)),
+                 column(width = 12,
+                        actionButton("resetMarkers", label = "Reset markers",
+                                     style = "background-color: #46EC46; color: black;")),
+                 column(width = 6,
+                        selectInput("exprs_marker_1",
+                                    label = span(paste("Select marker 1"),
+                                                 style = "color: black"),
+                                    choices = markers),
+                        contrast_input_1),
+                 column(width = 6,
+                        selectInput("exprs_marker_2",
+                                    label = span(paste("Select marker 2"),
+                                                 style = "color: black"),
+                                    choices = c(markers, ""),
+                                    selected = ""),
+                        contrast_input_2)
+        )
         
     })
 }
@@ -494,8 +499,44 @@
 .addPlots_tab2_pickcell <- function(input) {
     
     renderPrint({names(input)})
+
     
 }
+
+
+# overlay cell centroids on an expression plot
+.plotCentroids <- function(plot, image, mask, img_id="ImageName", ...){
+    # ... sends plotting parameters to points()
+    ncol <- ceiling(sqrt(length(image)))
+    nrow <- floor(sqrt(length(image))) 
+    if (length(image)==1){ncol<-2;nrow<-0}
+    yos <- rep(0:nrow, each = ncol) * 100
+    
+    for(i in 1:length(image)){
+        
+        id <- mcols(image)[,img_id][i]
+        cur_image <- image[mcols(image)[,img_id] == id]
+        cur_mask <- mask[mcols(mask)[,img_id] == id]
+        
+        centroids <- colData(measureObjects(cur_mask, cur_image, 
+                                            img_id=img_id))[,c("m.cx", "m.cy")]
+        
+        xoffset <- ((i) %% ncol)*100
+        yoffset <- yos[i+1]
+
+        #print(c(xoffset, yoffset))
+        points(x = centroids$m.cx + xoffset,
+               y = centroids$m.cy + yoffset, 
+               ...)
+        
+    }
+    
+}
+
+# Select centroids by brushing
+
+# Plot expression values for selection
+
 
 
 # Function to allow brushing
@@ -880,38 +921,31 @@
 # Visualize cell centroids on images
 .createExpressionCentroids <- function(input, object, mask, 
                                    image, img_id, cell_id, ...){
-    renderPlot({   
+    renderPlot({
+        
+        validate(need(is.null(image) == F,
+                      message = "Image must be supplied to find centroids"))
+        
+        
         cur_markers <- .select_markers(input)
         cur_bcg <- .select_contrast(input)
+
+        if (length(cur_markers) > 1) {
+            validate(need(cur_markers[1] != cur_markers[2],
+                          message = "Please specify two different markers"))
+        }
         
-        if (is.null(image)) {
-            cur_mask <- mask[mcols(mask)[,img_id] == input$sample]
-            
-                plotCells(object = object,
-                          mask = cur_mask,
-                          cell_id = cell_id,
-                          img_id = img_id,
-                          colour_by = cur_markers,
-                          exprs_values = input$assay,
-                          ...)
-                points(x=c(0,100,200), y = c(0,100,200), col = 2, cex = 2, pch = 20)
-    
-        } else {
-            
-            if (length(cur_markers) > 1) {
-                validate(need(cur_markers[1] != cur_markers[2],
-                              message = "Please specify two different markers"))
-            }
-            
-            cur_image <- image[mcols(image)[,img_id] == input$sample]
-                plotPixels(image = cur_image,
-                           colour_by = cur_markers,
-                           bcg = cur_bcg,
-                           ...)
-                points(x=c(0,100,200), y = c(0,100,200), col = 2, cex = 2, pch = 20)
+        cur_image <- image[mcols(image)[,img_id] == input$sample]
+
+            p = plotPixels(image = cur_image,
+                       colour_by = cur_markers,
+                       bcg = cur_bcg,
+                       return_plot = T,
+                       ...)
+            .plotCentroids(p, cur_image, mask,
+                           col=6, pch=20, cex=0.75)
         
-            }
-        })
+    })
 }
 
 # Visualize selected cells on images

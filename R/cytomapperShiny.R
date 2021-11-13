@@ -339,7 +339,7 @@ cytomapperShiny_notabs <- function(object,
 #'    data("pancreasImages")
 #'    data("pancreasMasks")
 #'
-#'    # Use shiny with SCE object, images and masks
+#'    # This viz requires SCE object, images and masks
 #'    pickCellShiny(object = pancreasSCE, mask = pancreasMasks, 
 #'                  image = pancreasImages, cell_id = "CellNb", 
 #'                  img_id = "ImageNb")
