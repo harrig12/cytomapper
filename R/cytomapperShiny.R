@@ -352,8 +352,8 @@ cytomapperShiny_notabs <- function(object,
 #'@import shiny
 #'@import shinydashboard
 pickCellShiny <- function(object,
-                          mask = NULL,
-                          image = NULL,
+                          mask,
+                          image,
                           cell_id = NULL,
                           img_id = NULL,
                           ...) {

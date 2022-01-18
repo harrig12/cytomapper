@@ -139,7 +139,7 @@
     output$AdditionalPlots_tab1 <- .addPlots_tab1_pickcell(input, object, mask, image)
     
     # Dynamically create image plot
-    output$AdditionalPlots_tab2 <- .addPlots_tab2_pickcell(input)
+    output$AdditionalPlots_tab2 <- .addPlots_tmp_pickcell(input)
     
     observe({
         
@@ -148,20 +148,18 @@
                                                                     session, rValues, objValues, 
                                                                     iter = cur_plot, img_id = img_id, 
                                                                     cell_id = cell_id)
-            
-            output[[paste0("info", cur_plot)]] <- renderText({
-                paste0("Selection: ", .brushRange(input[[paste0("plot_brush", 
-                                                                cur_plot)]]))
-            })
         })
     })
     
     if (!is.null(mask) || !is.null(image)) {
-        output$expression_centroids <- .createExpressionCentroids(input, object, 
-                                                          mask, image, img_id, cell_id, ...)
-        
-        output$image_selection <- .createImageSelection(input, objValues, 
-                                                        mask, image, img_id, cell_id, ...)
+        observe({
+            output$expression_centroids <- .createExpressionCentroids(input, object, 
+                                                              mask, image, rValues, objValues, 
+                                                              img_id, cell_id, ...)
+            
+            output$image_selection <- .createImageSelection(input, objValues, 
+                                                            mask, image, img_id, cell_id, ...)
+        })
     }
     
     output$downloadData <- .downloadSelection(input, objValues)

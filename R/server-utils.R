@@ -420,7 +420,6 @@
     markers <- rownames(object)
 
     renderUI({
-
         tabsetPanel(tabPanel(box(width = 12, 
                 column(width = 12,
                         actionButton("resetMarkers", label = "Reset markers",
@@ -442,8 +441,10 @@
                         svgPanZoomOutput("image_expression", height = "300px"))),
                 title = "Expression", status = "primary"),
                tabPanel(svgPanZoomOutput("image_selection"),
-                    title = "Selection", id = "selection", status = "primary",
-                    ))
+                    title = "Selection", id = "selection", status = "primary"
+                    )
+              
+        )
     })
 }
 
@@ -468,13 +469,12 @@
     
     renderUI({
         
-        bru <- brushOpts("centroid_brush",
-                  direction = "xy",
-                  resetOnNew = F)
-        
+        cell_brush <- brushOpts("cell_brush",
+                      direction = "xy",
+                      resetOnNew = F)
         
         fluidRow(column(width = 12,
-                        plotOutput("expression_centroids", brush = bru)),
+                        plotOutput("expression_centroids", brush = cell_brush)),
                  column(width = 12,
                         actionButton("resetMarkers", label = "Reset markers",
                                      style = "background-color: #46EC46; color: black;")),
@@ -498,14 +498,102 @@
 
 .addPlots_tab2_pickcell <- function(input) {
     
-    renderPrint({names(input)})
+    #renderPrint({names(input)})
+    
+    renderUI({
+        cur_row <- ceiling(input$plotCount / 2)
+        # Generate boxes
+        box_list <- lapply(seq_len(input$plotCount), function(cur_plot) {
+            
+            cur_val <- (cur_plot * 2) - 1
+            
+            box(plotOutput(paste0("scatter", cur_plot)),
+                verbatimTextOutput(paste0("info", cur_plot)),
+                title = paste("Plot", cur_plot),
+                status = "primary",
+                width = 6)
+        })
+        
+        lapply(seq_len(cur_row), function(cr) {
+            cur_val <- (cr * 2) - 1
+            fluidRow(box_list[seq.int(cur_val, cur_val + 1)])
+        })
+    })
+    
+}
 
+.addPlots_tmp_pickcell <- function(input) {
+    
+    renderPrint({c(names(input), input$cell_brush)})
+}
+
+# get cell centroids
+.getCentroids <- function(image, mask, pos_x_id, pos_y_id){
+    # image and mask both expected to by of class CytoImageList
+    
+    stopifnot(length(image)==1 & length(mask)==1)
+    
+    ncol <- ceiling(sqrt(length(image)))
+    nrow <- floor(sqrt(length(image))) 
+    if (length(image)==1){ncol<-2;nrow<-0}
+    yos <- rep(0:nrow, each = ncol) * 100
+    centroids <- list()
+    
+    for(i in 1:length(image)){
+        
+        id <- mcols(image)[,img_id][i]
+        cur_image <- image[mcols(image)[,img_id] == id]
+        cur_mask <- mask[mcols(mask)[,img_id] == id]
+        
+        c <- colData(measureObjects(cur_mask, cur_image, 
+                                            img_id=img_id))[,c("m.cx", "m.cy")]
+        
+        c$xvar <- c$m.cx + ((i) %% ncol)*100
+        c$yvar <- c$m.cy + yos[i+1]
+        
+        centroids[[i]] <- c
+
+    }
+    
+    return(centroids)
+    
+}
+
+# plot sce points
+.getCentroids <- function(image, sce){
+    # image should be of class CytoImageList
+    # sce of class SingleCellExperiment
+    # expect them to align channel and element-wise
+    
+    stopifnot(length(image) == 1)
+    
+    sel <- colData(sce)[['ImageName']] == names(image)
+    sce <- rowSubset(sel)
+    
+    
+    for(i in 1:length(image)){
+        
+        id <- mcols(image)[,img_id][i]
+        cur_image <- image[mcols(image)[,img_id] == id]
+        cur_mask <- mask[mcols(mask)[,img_id] == id]
+        
+        c <- colData(measureObjects(cur_mask, cur_image, 
+                                    img_id=img_id))[,c("m.cx", "m.cy")]
+        
+        c$xvar <- c$m.cx + ((i) %% ncol)*100
+        c$yvar <- c$m.cy + yos[i+1]
+        
+        centroids[[i]] <- c
+        
+    }
+    
+    return(centroids)
     
 }
 
 
 # overlay cell centroids on an expression plot
-.plotCentroids <- function(plot, image, mask, img_id="ImageName", ...){
+.plotCentroids <- function(plot, image, mask, rValues, objValues, img_id="ImageName", ...){
     # ... sends plotting parameters to points()
     ncol <- ceiling(sqrt(length(image)))
     nrow <- floor(sqrt(length(image))) 
@@ -521,12 +609,12 @@
         centroids <- colData(measureObjects(cur_mask, cur_image, 
                                             img_id=img_id))[,c("m.cx", "m.cy")]
         
-        xoffset <- ((i) %% ncol)*100
-        yoffset <- yos[i+1]
-
-        #print(c(xoffset, yoffset))
-        points(x = centroids$m.cx + xoffset,
-               y = centroids$m.cy + yoffset, 
+        centroids$xvar <- centroids$m.cx + ((i) %% ncol)*100
+        centroids$yvar <- centroids$m.cy + yos[i+1]
+        
+        
+        points(x =  centroids$xvar,
+               y =  centroids$yvar,
                ...)
         
     }
@@ -534,9 +622,36 @@
 }
 
 # Select centroids by brushing
+#' @importFrom S4Vectors metadata
+#' @importFrom SummarizedExperiment metadata<-
+.brushCell <- function(input, rValues, objValues, iter){
+    
+    cur_val <- (iter * 2) - 1
+    
+    if (is.null(objValues[[paste0("object", iter)]])) {
+        return(NULL)
+    }
+    
+    # Build data frame
+    cur_df <- as.data.frame(t(assay(objValues[[paste0("object", iter)]], 
+                                    input$assay)))
+    cur_df$sample <- input$sample
+    
+    # Brush the data.frame
+    cur_selection <- brushedPoints(rValues[['centroids']], input[["cell_brush"]], 
+                                   xvar='xvar', yvar='yvar',allRows = TRUE)
+    
+    
+    #objValues[[paste0("object", iter + 1)]] <- 
+    #    objValues[[paste0("object", iter)]][,cur_selection$selected_]
+    
+    print(objValues[['object1']])
+}
+
 
 # Plot expression values for selection
 
+    
 
 
 # Function to allow brushing
@@ -545,47 +660,47 @@
 .brushObject <- function(input, session, objValues, iter){
     
     cur_val <- (iter * 2) - 1
-
+    
     if (is.null(objValues[[paste0("object", iter)]])) {
         return(NULL)
     }
-
+    
     # Build data frame
     cur_df <- as.data.frame(t(assay(objValues[[paste0("object", iter)]], 
                                     input$assay)))
     cur_df$sample <- input$sample
-
+    
     # Brush the data.frame
     cur_selection <- brushedPoints(cur_df, input[[paste0("plot_brush", iter)]], 
-                                    allRows = TRUE)
-
+                                   allRows = TRUE)
+    
     # Save the Gate
     cur_gate <- list()
-
+    
     gate <- matrix(data = c(input[[paste0("plot_brush", iter)]]$xmin,
                             input[[paste0("plot_brush", iter)]]$xmax,
                             input[[paste0("plot_brush", iter)]]$ymin,
                             input[[paste0("plot_brush", iter)]]$ymax),
-                    nrow = 2, ncol = 2,
-                    byrow = TRUE,
-                    dimnames = list(
-                        c(input[[paste0("plot_brush", iter)]]$mapping$x,
-                            input[[paste0("plot_brush", iter)]]$mapping$y), 
-                        c("min", "max")
-                        )
-                    )
-
+                   nrow = 2, ncol = 2,
+                   byrow = TRUE,
+                   dimnames = list(
+                       c(input[[paste0("plot_brush", iter)]]$mapping$x,
+                         input[[paste0("plot_brush", iter)]]$mapping$y), 
+                       c("min", "max")
+                   )
+    )
+    
     if (rownames(gate)[1] == "sample") {
         gate <- gate[-1, , drop = FALSE]
     }
-
+    
     cur_gate$gate <- gate
     cur_gate$exprs_values <- input$assay
     cur_gate$img_id <- input$sample
-
+    
     # Save gates
     next_obj <- objValues[[paste0("object", iter)]]
-
+    
     if (!is.null(metadata(next_obj)) && iter == 1) {
         cur_meta <- list(metadata = metadata(next_obj))
         cur_meta[[paste0("cytomapper_gate_", iter)]] <- cur_gate
@@ -593,20 +708,19 @@
     } else {
         metadata(next_obj)[[paste0("cytomapper_gate_", iter)]] <- cur_gate
     }
-
+    
     if (sum(cur_selection$selected_) > 0) {
         objValues[[paste0("object", iter + 1)]] <- 
             next_obj[,cur_selection$selected_]
     } else {
         # Set next object to NULL
         objValues[[paste0("object", iter + 1)]] <- NULL
-
+        
         # Clear all following objects
         .clearObjects(objValues, iter)
     }
-
+    
 }
-
 # Scatter plot helpers
 .plotScatter <- function(input, rValues, objValues, iter, cur_val){
 
@@ -764,27 +878,15 @@
 
         cur_val <- (iter * 2) - 1
 
-        if (iter == 1) {
-            req(rValues$ranges, objValues$object1,
-                input$assay, input$Marker_1)
-        } else {
-            req(rValues$ranges, input[[paste0("plot_brush", iter - 1)]],
-                input$assay, input[[paste0("Marker_", cur_val)]])
-        }
-
-        if (iter > 1 && is.null(input[[paste0("plot_brush", iter - 1)]])) {
-            return(NULL)
-        }
-
-        if (is.null(input[[paste0("plot_brush", iter)]])) {
-
-            .clearObjects(objValues, iter)
-            .clearBrush(input, session, iter)
-
-        } else {
-            .brushObject(input, session, objValues, iter = iter)
-        }
-
+        req(rValues$ranges, input$assay, input[[paste0("Marker_", cur_val)]], 
+            objValues[[paste0("object", iter)]])
+        
+        # set next object to contain all brushed points, coloured by cell selection
+        objValues[[paste0("object", iter + 1)]] <- objValues[[paste0("object", iter)]]
+        
+        .brushCell(input, rValues, objValues, iter)
+        
+        
         # Plot scatter or violin
         if (input[[paste0("Marker_", cur_val + 1)]] != "") {
             p <- .plotScatter(input, rValues, objValues, iter, cur_val)
@@ -919,9 +1021,11 @@
 }
 
 # Visualize cell centroids on images
-.createExpressionCentroids <- function(input, object, mask, 
-                                   image, img_id, cell_id, ...){
+.createExpressionCentroids <- function(input, object, mask, image, 
+                                       rValues, objValues, img_id, cell_id, ...){
     renderPlot({
+        
+        req(input$sample)
         
         validate(need(is.null(image) == F,
                       message = "Image must be supplied to find centroids"))
@@ -936,14 +1040,21 @@
         }
         
         cur_image <- image[mcols(image)[,img_id] == input$sample]
-
-            p = plotPixels(image = cur_image,
+        cur_mask <- mask[mcols(mask)[,img_id] == input$sample]
+        
+        p = plotPixels(image = cur_image,
                        colour_by = cur_markers,
                        bcg = cur_bcg,
                        return_plot = T,
                        ...)
-            .plotCentroids(p, cur_image, mask,
-                           col=6, pch=20, cex=0.75)
+        
+        # find cell centroids to plot
+        print(names(input))
+        print(input$sample)
+        rValues$centroids <- .getCentroids(cur_image, cur_mask)[[1]]
+        
+        .plotCentroids(p, cur_image, mask, rValues, objValues,
+                       col=6, pch=20, cex=0.75)
         
     })
 }
