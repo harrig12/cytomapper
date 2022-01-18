@@ -525,99 +525,36 @@
 .addPlots_tmp_pickcell <- function(input) {
     
     renderPrint({c(names(input), input$cell_brush)})
+    
+    
 }
 
 # get cell centroids
-.getCentroids <- function(image, mask, pos_x_id, pos_y_id){
+#' @importFrom magrittr %>%
+.getCentroids <- function(image, mask, img_id){
     # image and mask both expected to by of class CytoImageList
     
     stopifnot(length(image)==1 & length(mask)==1)
     
-    ncol <- ceiling(sqrt(length(image)))
-    nrow <- floor(sqrt(length(image))) 
-    if (length(image)==1){ncol<-2;nrow<-0}
-    yos <- rep(0:nrow, each = ncol) * 100
-    centroids <- list()
-    
-    for(i in 1:length(image)){
-        
-        id <- mcols(image)[,img_id][i]
-        cur_image <- image[mcols(image)[,img_id] == id]
-        cur_mask <- mask[mcols(mask)[,img_id] == id]
-        
-        c <- colData(measureObjects(cur_mask, cur_image, 
-                                            img_id=img_id))[,c("m.cx", "m.cy")]
-        
-        c$xvar <- c$m.cx + ((i) %% ncol)*100
-        c$yvar <- c$m.cy + yos[i+1]
-        
-        centroids[[i]] <- c
-
-    }
-    
-    return(centroids)
-    
+    measureObjects(mask, image, img_id=img_id) %>%
+        colData() %>%
+        subset(select=c(img_id, 'object_id', 'm.cx', 'm.cy')) %>%
+        return()
 }
-
-# plot sce points
-.getCentroids <- function(image, sce){
-    # image should be of class CytoImageList
-    # sce of class SingleCellExperiment
-    # expect them to align channel and element-wise
-    
-    stopifnot(length(image) == 1)
-    
-    sel <- colData(sce)[['ImageName']] == names(image)
-    sce <- rowSubset(sel)
-    
-    
-    for(i in 1:length(image)){
-        
-        id <- mcols(image)[,img_id][i]
-        cur_image <- image[mcols(image)[,img_id] == id]
-        cur_mask <- mask[mcols(mask)[,img_id] == id]
-        
-        c <- colData(measureObjects(cur_mask, cur_image, 
-                                    img_id=img_id))[,c("m.cx", "m.cy")]
-        
-        c$xvar <- c$m.cx + ((i) %% ncol)*100
-        c$yvar <- c$m.cy + yos[i+1]
-        
-        centroids[[i]] <- c
-        
-    }
-    
-    return(centroids)
-    
-}
-
 
 # overlay cell centroids on an expression plot
-.plotCentroids <- function(plot, image, mask, rValues, objValues, img_id="ImageName", ...){
+.plotCentroids <- function(image, mask, rValues, img_id="ImageName", ...){
     # ... sends plotting parameters to points()
-    ncol <- ceiling(sqrt(length(image)))
-    nrow <- floor(sqrt(length(image))) 
-    if (length(image)==1){ncol<-2;nrow<-0}
-    yos <- rep(0:nrow, each = ncol) * 100
     
-    for(i in 1:length(image)){
-        
-        id <- mcols(image)[,img_id][i]
-        cur_image <- image[mcols(image)[,img_id] == id]
-        cur_mask <- mask[mcols(mask)[,img_id] == id]
-        
-        centroids <- colData(measureObjects(cur_mask, cur_image, 
-                                            img_id=img_id))[,c("m.cx", "m.cy")]
-        
-        centroids$xvar <- centroids$m.cx + ((i) %% ncol)*100
-        centroids$yvar <- centroids$m.cy + yos[i+1]
-        
-        
-        points(x =  centroids$xvar,
-               y =  centroids$yvar,
-               ...)
-        
-    }
+    
+    stopifnot(length(image)==1 & length(mask)==1)
+    
+    c <- .getCentroids(image, mask, img_id)
+    
+    points(x =  c$m.cx + 100,
+           y =  c$m.cy,
+           ...)
+    
     
 }
 
@@ -1051,9 +988,8 @@
         # find cell centroids to plot
         print(names(input))
         print(input$sample)
-        rValues$centroids <- .getCentroids(cur_image, cur_mask)[[1]]
         
-        .plotCentroids(p, cur_image, mask, rValues, objValues,
+        .plotCentroids(cur_image, cur_mask, rValues, img_id,
                        col=6, pch=20, cex=0.75)
         
     })
